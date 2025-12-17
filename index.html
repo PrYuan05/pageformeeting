@@ -1,304 +1,582 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { ChevronRight, ChevronDown, Database, Cpu, Network, Zap, Server, Layers, Box, Activity, GitMerge, ArrowLeftRight } from 'lucide-react';
-
-const MindMapData = {
-  id: 'root',
-  title: 'NVIDIA LLM 加速與全棧優化',
-  description: '核心目標：極限壓縮 LLM 訓練時間與推論延遲',
-  color: 'bg-green-600',
-  icon: <Activity className="w-6 h-6 text-white" />,
-  children: [
-    {
-      id: 'I',
-      title: 'I. 運算硬體平台與架構 (DGX SuperPOD)',
-      description: 'DGX SuperPOD 作為硬體基石，提供大規模、標準化的運算環境。',
-      color: 'bg-blue-600',
-      icon: <Server className="w-5 h-5 text-white" />,
-      children: [
-        {
-          id: 'I-1',
-          title: '1. GPU 記憶體階層 (Memory Hierarchy)',
-          color: 'bg-blue-500',
-          icon: <Database className="w-4 h-4 text-white" />,
-          children: [
-            {
-              id: 'I-1-SRAM',
-              title: 'SRAM (Static RAM)',
-              details: [
-                { label: '特點', value: '極小、極快、低延遲' },
-                { label: '用途', value: '存放 CUDA Kernel 正在運算中的臨時數據 (L1/Shared Memory)' },
-                { label: '優化點', value: '必須最大化數據重用，減少對 HBM 的存取' }
-              ]
-            },
-            {
-              id: 'I-1-HBM',
-              title: 'HBM (High Bandwidth Memory)',
-              details: [
-                { label: '特點', value: '容量大、頻寬高，但延遲高於 SRAM' },
-                { label: '用途', value: '存放 LLM 模型權重、KV Cache、大型中間張量' }
-              ]
-            }
-          ]
-        },
-        {
-          id: 'I-2',
-          title: '2. CUDA Kernels (底層運算指令)',
-          color: 'bg-blue-500',
-          icon: <Cpu className="w-4 h-4 text-white" />,
-          children: [
-            {
-              id: 'I-2-Opt',
-              title: '優化與實例',
-              details: [
-                { label: '定位', value: 'GPU 上的實際執行單元' },
-                { label: '優化目標', value: '算子融合 (Operator Fusion) & Tiling (分塊)，解決 Memory Wall' },
-                { label: '實例', value: 'FlashAttention / PagedAttention' },
-                { label: 'FlashAttention', value: '減少 HBM 讀寫比增加運算更能提升效率' }
-              ]
-            }
-          ]
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NVIDIA LLM 全棧優化加速器 | 互動儀表板</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;700&display=swap');
+        
+        body {
+            font-family: 'Noto Sans TC', sans-serif;
+            background-color: #fdfbf7; /* Warm neutral background */
+            color: #1f2937;
         }
-      ]
-    },
-    {
-      id: 'II',
-      title: 'II. 分散式通訊與網路 (NVLink & InfiniBand)',
-      description: '解決大規模運算中的「通訊牆」瓶頸。',
-      color: 'bg-purple-600',
-      icon: <Network className="w-5 h-5 text-white" />,
-      children: [
-        {
-          id: 'II-1',
-          title: '1. 節點內部高速互連 (Intra-Node)',
-          color: 'bg-purple-500',
-          icon: <Box className="w-4 h-4 text-white" />,
-          children: [
-            {
-              id: 'II-1-NVLink',
-              title: 'NVLink (點對點 & Switch)',
-              details: [
-                { label: '功能', value: '單台 DGX 內 GPU 間超高帶寬、低延遲連接' },
-                { label: '應用', value: '實現高效的 Tensor Parallelism (張量並行)' }
-              ]
-            }
-          ]
-        },
-        {
-          id: 'II-2',
-          title: '2. 節點間超大規模互連 (Inter-Node)',
-          color: 'bg-purple-500',
-          icon: <ArrowLeftRight className="w-4 h-4 text-white" />,
-          children: [
-            {
-              id: 'II-2-IB',
-              title: 'InfiniBand (骨幹網絡)',
-              children: [
-                {
-                  id: 'II-2-RDMA',
-                  title: '技術一：RDMA',
-                  details: [
-                    { label: '核心', value: 'GPUDirect RDMA 繞過 CPU，GPU 記憶體直接存取' },
-                    { label: '價值', value: '消除 CPU 介入延遲與記憶體拷貝' }
-                  ]
-                },
-                {
-                  id: 'II-2-SHARP',
-                  title: '技術二：SHARP',
-                  details: [
-                    { label: '核心', value: 'Switch 硬體層級進行梯度聚合 (All-Reduce)' },
-                    { label: '價值', value: '減少傳輸量，加速大規模訓練同步' }
-                  ]
-                },
-                {
-                  id: 'II-2-AR',
-                  title: '技術三：動態路由 (Adaptive Routing)',
-                  details: [
-                    { label: '核心', value: '依即時流量自動分流' },
-                    { label: '價值', value: '避免擁塞，維持低延遲一致性' }
-                  ]
-                }
-              ]
-            }
-          ]
-        },
-        {
-          id: 'II-3',
-          title: '3. 分散式演算法',
-          color: 'bg-purple-500',
-          icon: <GitMerge className="w-4 h-4 text-white" />,
-          children: [
-            {
-              id: 'II-3-Algos',
-              title: 'AllReduce 策略',
-              details: [
-                { label: 'Ring-AllReduce', value: '帶寬效率高，適合大規模數據並行' },
-                { label: 'Tree-AllReduce', value: '延遲低，但有單點故障風險' }
-              ]
-            }
-          ]
+
+        /* Chart Container Strict Styling */
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+            height: 300px; /* Base height */
+            max-height: 400px;
         }
-      ]
-    },
-    {
-      id: 'III',
-      title: 'III. 軟體平台與推論優化 (NVAIE & TensorRT-LLM)',
-      description: '將底層硬體能力轉換為企業級的穩定應用。',
-      color: 'bg-orange-600',
-      icon: <Layers className="w-5 h-5 text-white" />,
-      children: [
-        {
-          id: 'III-1',
-          title: '1. NVIDIA AI Enterprise (NVAIE)',
-          color: 'bg-orange-500',
-          icon: <Zap className="w-4 h-4 text-white" />,
-          children: [
-            {
-              id: 'III-1-Desc',
-              title: '企業級軟體套件',
-              details: [
-                { label: '定位', value: '提供驗證、優化的深度學習框架' },
-                { label: '價值', value: '確保 CUDA/TRT-LLM 穩定運行，提供原廠支援' }
-              ]
+        
+        @media (min-width: 768px) {
+            .chart-container {
+                height: 350px;
             }
-          ]
-        },
-        {
-          id: 'III-2',
-          title: '2. TensorRT-LLM (推論優化核心)',
-          color: 'bg-orange-500',
-          icon: <Cpu className="w-4 h-4 text-white" />,
-          children: [
-            {
-              id: 'III-2-Opt',
-              title: '優化手段',
-              details: [
-                { label: '算子與精度', value: '內建 FP8 量化、FlashAttention' },
-                { label: '動態管理', value: 'In-flight Batching 最大化利用率，優化 TTFT' },
-                { label: '架構轉換', value: '模型轉為 TensorRT 引擎，支援多節點部署' }
-              ]
-            }
-          ]
         }
-      ]
-    }
-  ]
-};
 
-const TreeNode = ({ node, level = 0, isLast = false }) => {
-  const [isOpen, setIsOpen] = useState(level < 2); // Auto open first 2 levels
-  const hasChildren = node.children && node.children.length > 0;
-  const hasDetails = node.details && node.details.length > 0;
+        /* Custom Scrollbar for sleek look */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
 
-  const toggleOpen = () => setIsOpen(!isOpen);
+        .nav-active {
+            border-bottom: 2px solid #76b900; /* NVIDIA Green-ish */
+            color: #1a202c;
+            font-weight: 700;
+        }
 
-  return (
-    <div className="flex flex-col relative">
-      {/* Node Content */}
-      <div className={`flex items-start group ${level > 0 ? 'ml-8' : ''} relative`}>
-        {/* Connection Lines (Vertical and Horizontal) */}
-        {level > 0 && (
-          <>
-            {/* Vertical line from parent */}
-            <div className="absolute -left-8 top-0 w-px h-full bg-gray-300 group-last:h-6" style={{ height: isLast ? '24px' : '100%' }}></div>
-            {/* Horizontal line to node */}
-            <div className="absolute -left-8 top-6 w-8 h-px bg-gray-300"></div>
-          </>
-        )}
+        .card-hover:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
 
-        <div className="flex flex-col mb-4 w-full">
-          <div 
-            onClick={toggleOpen}
-            className={`
-              flex items-center p-3 rounded-lg shadow-sm border transition-all duration-200 cursor-pointer w-full md:w-auto md:max-w-2xl
-              ${level === 0 ? 'bg-slate-900 text-white border-slate-900' : 'bg-white hover:shadow-md border-gray-200'}
-              ${isOpen && hasChildren ? 'ring-2 ring-offset-1 ring-blue-100' : ''}
-            `}
-          >
-            {/* Icon */}
-            <div className={`
-              flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center mr-4 shadow-sm
-              ${node.color || 'bg-gray-500'}
-            `}>
-              {node.icon || <div className="w-2 h-2 bg-white rounded-full" />}
+        /* Visualization for Batching Simulation */
+        .request-block {
+            transition: all 0.5s ease;
+        }
+    </style>
+    <!-- Chosen Palette: Warm Neutrals with NVIDIA-inspired Green Accents. Background: Off-white (#fdfbf7), Text: Dark Grey, Accents: #76b900 (Green), #4a5568 (Cool Grey) -->
+    <!-- Application Structure Plan: 
+         1. Header & Context: Intro to the goal (Latency/Training Time).
+         2. Navigation: Logical flow from Bottom-up (Hardware -> Network -> Software).
+         3. Section I: Hardware (Compute): Focus on the SRAM vs HBM bottleneck and how CUDA/FlashAttention solves it. Interaction: Chart toggle.
+         4. Section II: Network (Communication): Focus on the "Communication Wall". Visualization: Scaling efficiency chart comparing methods. Interactive cards for IB technologies.
+         5. Section III: Software (Inference): Focus on TensorRT-LLM. Interaction: A "Batching Simulator" to visually demonstrate In-flight Batching vs Static.
+         This structure tells the story of how raw iron is optimized, connected, and then orchestrated software-wise. 
+    -->
+    <!-- Visualization & Content Choices:
+         1. Hardware: Bar Chart for SRAM/HBM Bandwidth/Latency comparison (Goal: Inform scale difference).
+         2. Network: Line Chart for Scaling Efficiency (Goal: Compare Ring vs Tree/SHARP).
+         3. Software: CSS/JS Animation for Batching (Goal: Change/Demonstrate Concept).
+         4. Content: All text extracted directly from the provided Mind Map.
+    -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+</head>
+<body class="flex flex-col min-h-screen">
+
+    <!-- Header -->
+    <header class="bg-white shadow-sm sticky top-0 z-50">
+        <div class="container mx-auto px-4 py-4 flex justify-between items-center">
+            <div class="flex items-center space-x-2">
+                <div class="w-3 h-8 bg-green-600 rounded-sm"></div>
+                <h1 class="text-xl md:text-2xl font-bold tracking-tight text-gray-800">NVIDIA LLM 全棧優化儀表板</h1>
             </div>
+            <nav class="hidden md:flex space-x-6">
+                <button onclick="scrollToSection('intro')" class="text-gray-600 hover:text-green-700 transition-colors">總覽</button>
+                <button onclick="scrollToSection('hardware')" class="text-gray-600 hover:text-green-700 transition-colors">運算硬體</button>
+                <button onclick="scrollToSection('network')" class="text-gray-600 hover:text-green-700 transition-colors">通訊網路</button>
+                <button onclick="scrollToSection('software')" class="text-gray-600 hover:text-green-700 transition-colors">軟體優化</button>
+            </nav>
+        </div>
+    </header>
 
-            {/* Text Content */}
-            <div className="flex-grow">
-              <h3 className={`font-bold text-lg ${level === 0 ? 'text-white' : 'text-gray-800'}`}>
-                {node.title}
-              </h3>
-              {node.description && (
-                <p className={`text-sm mt-1 ${level === 0 ? 'text-gray-300' : 'text-gray-500'}`}>
-                  {node.description}
+    <!-- Main Content -->
+    <main class="flex-grow container mx-auto px-4 py-8 space-y-16">
+
+        <!-- Intro Section -->
+        <section id="intro" class="max-w-4xl mx-auto text-center space-y-6">
+            <h2 class="text-3xl md:text-4xl font-bold text-gray-900">核心目標：極限壓縮 LLM 訓練時間與推論延遲</h2>
+            <p class="text-lg text-gray-600 leading-relaxed">
+                本應用程式解析 NVIDIA 如何透過硬體、網路與軟體的全棧整合，解決大規模 AI 運算中的瓶頸。
+                從底層記憶體階層的數據搬運，到萬卡集群的通訊協定，再到推論階段的動態排程，每一步都在挑戰物理極限。
+            </p>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-8">
+                <div class="p-6 bg-white rounded-xl border border-gray-100 shadow-sm">
+                    <div class="text-2xl mb-2">🚀</div>
+                    <h3 class="font-bold text-gray-800">運算加速</h3>
+                    <p class="text-sm text-gray-500">DGX SuperPOD & CUDA</p>
+                </div>
+                <div class="p-6 bg-white rounded-xl border border-gray-100 shadow-sm">
+                    <div class="text-2xl mb-2">🌐</div>
+                    <h3 class="font-bold text-gray-800">通訊突破</h3>
+                    <p class="text-sm text-gray-500">NVLink & InfiniBand</p>
+                </div>
+                <div class="p-6 bg-white rounded-xl border border-gray-100 shadow-sm">
+                    <div class="text-2xl mb-2">🧠</div>
+                    <h3 class="font-bold text-gray-800">推論極致</h3>
+                    <p class="text-sm text-gray-500">TensorRT-LLM</p>
+                </div>
+            </div>
+        </section>
+
+        <hr class="border-gray-200">
+
+        <!-- Section I: Hardware -->
+        <section id="hardware" class="scroll-mt-24">
+            <div class="mb-8">
+                <span class="text-green-600 font-bold tracking-wider uppercase text-sm">I. 運算硬體平台與架構 (DGX SuperPOD)</span>
+                <h2 class="text-3xl font-bold text-gray-900 mt-2">記憶體階層與 CUDA 優化</h2>
+                <p class="mt-4 text-gray-600 max-w-3xl">
+                    在硬體層級，效能瓶頸往往不在於計算能力，而在於「記憶體牆 (Memory Wall)」。
+                    了解 SRAM (L1/Shared Memory) 與 HBM (High Bandwidth Memory) 的差異，是理解 CUDA Kernel 優化（如 FlashAttention）的關鍵。
+                    SRAM 極快但容量小，HBM 容量大但延遲較高。
                 </p>
-              )}
             </div>
 
-            {/* Chevron */}
-            {(hasChildren || hasDetails) && (
-              <div className={`ml-4 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}>
-                <ChevronDown className={`w-5 h-5 ${level === 0 ? 'text-white' : 'text-gray-400'}`} />
-              </div>
-            )}
-          </div>
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+                <!-- Visualization Col -->
+                <div class="bg-white p-6 rounded-2xl shadow-lg border border-gray-100">
+                    <h3 class="text-lg font-bold text-gray-800 mb-4 text-center">記憶體階層性能對比 (示意圖)</h3>
+                    <!-- Chart Container -->
+                    <div class="chart-container">
+                        <canvas id="memoryChart"></canvas>
+                    </div>
+                    <div class="mt-4 text-center text-sm text-gray-500">
+                        注意：Y 軸為對數刻度，SRAM 的頻寬遠高於 HBM，但延遲極低。
+                    </div>
+                </div>
 
-          {/* Details Panel (Leaf Nodes) */}
-          {isOpen && hasDetails && (
-             <div className="mt-2 ml-4 md:ml-14 p-4 bg-gray-50 rounded-lg border border-gray-200 text-sm shadow-inner">
-               <ul className="space-y-2">
-                 {node.details.map((detail, idx) => (
-                   <li key={idx} className="flex flex-col sm:flex-row sm:items-start gap-1 sm:gap-2">
-                     <span className="font-semibold text-blue-700 min-w-[60px]">{detail.label}:</span>
-                     <span className="text-gray-700">{detail.value}</span>
-                   </li>
-                 ))}
-               </ul>
-             </div>
-          )}
+                <!-- Interaction/Content Col -->
+                <div class="space-y-6">
+                    <div class="bg-blue-50 p-6 rounded-xl border-l-4 border-blue-500">
+                        <h4 class="font-bold text-blue-900 text-lg mb-2">核心挑戰：Memory Wall</h4>
+                        <p class="text-blue-800 text-sm">
+                            如果 CUDA Kernel 頻繁地讀寫 HBM，強大的 GPU 算力將會閒置等待數據。
+                            優化的目標是：<span class="font-bold">最大化數據在 SRAM 中的重用 (Data Reuse)。</span>
+                        </p>
+                    </div>
+
+                    <div class="space-y-4">
+                        <h4 class="font-bold text-gray-800 border-b pb-2">CUDA Kernels 優化技術</h4>
+                        
+                        <div class="group cursor-pointer" onclick="toggleDetail('flash-att')">
+                            <div class="flex justify-between items-center bg-white p-4 rounded-lg shadow-sm hover:bg-gray-50 transition border border-gray-200">
+                                <span class="font-bold text-gray-700">⚡ FlashAttention (算子融合)</span>
+                                <span class="text-gray-400 group-hover:text-green-600">▼</span>
+                            </div>
+                            <div id="flash-att" class="hidden px-4 py-3 bg-gray-50 text-sm text-gray-600 rounded-b-lg border-x border-b border-gray-200">
+                                <p>透過 Tiling (分塊) 技術，將巨大的矩陣運算拆解，使數據盡量停留在 SRAM 中完成運算。這減少了對 HBM 的存取次數，其帶來的速度提升比單純增加運算力更顯著。</p>
+                            </div>
+                        </div>
+
+                        <div class="group cursor-pointer" onclick="toggleDetail('sram-opt')">
+                            <div class="flex justify-between items-center bg-white p-4 rounded-lg shadow-sm hover:bg-gray-50 transition border border-gray-200">
+                                <span class="font-bold text-gray-700">💾 SRAM (Static RAM) 應用</span>
+                                <span class="text-gray-400 group-hover:text-green-600">▼</span>
+                            </div>
+                            <div id="sram-opt" class="hidden px-4 py-3 bg-gray-50 text-sm text-gray-600 rounded-b-lg border-x border-b border-gray-200">
+                                <p>用於存放正在運算的臨時數據 (L1 Cache, Shared Memory)。優化重點在於精心設計演算法，以適應其極小但極快的特性。</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section II: Network -->
+        <section id="network" class="scroll-mt-24 bg-gray-50 -mx-4 px-4 py-12">
+            <div class="container mx-auto">
+                <div class="mb-8">
+                    <span class="text-green-600 font-bold tracking-wider uppercase text-sm">II. 分散式通訊與網路</span>
+                    <h2 class="text-3xl font-bold text-gray-900 mt-2">打破通訊牆 (Communication Wall)</h2>
+                    <p class="mt-4 text-gray-600 max-w-3xl">
+                        當模型規模超越單機極限，我們需要 NVLink 與 InfiniBand。
+                        NVLink 負責節點內的高速直連，InfiniBand 負責節點間的大規模互聯。
+                        這裡展示了不同通訊協定與技術如何影響大規模訓練的效率。
+                    </p>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                    <!-- Tech Cards -->
+                    <div class="lg:col-span-1 space-y-4">
+                        <h3 class="font-bold text-gray-700 mb-4">關鍵通訊技術 (點擊查看)</h3>
+                        
+                        <div onclick="selectNetworkTech('rdma')" class="bg-white p-5 rounded-xl shadow-sm cursor-pointer card-hover border border-gray-200 transition-all active-tech" id="tech-rdma">
+                            <div class="font-bold text-gray-800 mb-1">RDMA (GPUDirect)</div>
+                            <div class="text-xs text-gray-500">繞過 CPU 的高速通道</div>
+                        </div>
+
+                        <div onclick="selectNetworkTech('sharp')" class="bg-white p-5 rounded-xl shadow-sm cursor-pointer card-hover border border-gray-200 transition-all" id="tech-sharp">
+                            <div class="font-bold text-gray-800 mb-1">SHARP 技術</div>
+                            <div class="text-xs text-gray-500">交換機內的梯度聚合運算</div>
+                        </div>
+
+                        <div onclick="selectNetworkTech('adaptive')" class="bg-white p-5 rounded-xl shadow-sm cursor-pointer card-hover border border-gray-200 transition-all" id="tech-adaptive">
+                            <div class="font-bold text-gray-800 mb-1">動態路由 (Adaptive Routing)</div>
+                            <div class="text-xs text-gray-500">自動避開網路擁塞</div>
+                        </div>
+                    </div>
+
+                    <!-- Interactive Display -->
+                    <div class="lg:col-span-2 bg-white p-6 rounded-2xl shadow-lg border border-gray-100 flex flex-col justify-between">
+                        <div>
+                            <h3 id="net-title" class="text-xl font-bold text-green-700 mb-2">RDMA (Remote Direct Memory Access)</h3>
+                            <p id="net-desc" class="text-gray-600 mb-6 min-h-[60px]">
+                                核心：允許 GPU 記憶體直接進行遠端存取，完全繞過 CPU。價值：消除了 CPU 介入和記憶體拷貝帶來的延遲，對於維持線性擴展性至關重要。
+                            </p>
+                        </div>
+                        
+                        <!-- Chart Container -->
+                        <div class="w-full bg-gray-50 rounded-lg p-2">
+                             <h4 class="text-center text-xs font-bold text-gray-500 mb-2">模擬：大規模訓練擴展效率 (Scaling Efficiency)</h4>
+                             <div class="chart-container">
+                                <canvas id="networkChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Algorithms Grid -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-8">
+                    <div class="bg-white p-5 rounded-xl border border-gray-200">
+                        <h4 class="font-bold text-gray-800 mb-2">Ring-AllReduce</h4>
+                        <p class="text-sm text-gray-600">通訊模式效率高，將節點構成環狀，適合大規模訓練的數據並行。帶寬利用率佳。</p>
+                    </div>
+                    <div class="bg-white p-5 rounded-xl border border-gray-200">
+                        <h4 class="font-bold text-gray-800 mb-2">Tree-AllReduce</h4>
+                        <p class="text-sm text-gray-600">樹狀結構，延遲較低，適合對延遲敏感的場景，但根節點可能有性能瓶頸與單點故障風險。</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section III: Software -->
+        <section id="software" class="scroll-mt-24">
+            <div class="mb-8">
+                <span class="text-green-600 font-bold tracking-wider uppercase text-sm">III. 軟體平台與推論優化</span>
+                <h2 class="text-3xl font-bold text-gray-900 mt-2">TensorRT-LLM 與 NVAIE</h2>
+                <p class="mt-4 text-gray-600 max-w-3xl">
+                    硬體提供了可能性，軟體則實現了價值。NVIDIA AI Enterprise (NVAIE) 提供了企業級的穩定環境，而 TensorRT-LLM 則透過各種黑科技（如 In-flight Batching）將推論延遲壓到極限。
+                </p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-12 gap-8">
+                <!-- Concept Column -->
+                <div class="md:col-span-5 space-y-6">
+                    <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200 h-full">
+                        <h3 class="font-bold text-gray-800 mb-4 text-lg">TensorRT-LLM 優化手段</h3>
+                        <ul class="space-y-4">
+                            <li class="flex items-start">
+                                <span class="bg-green-100 text-green-700 rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold mr-3 mt-1">1</span>
+                                <div>
+                                    <span class="font-bold text-gray-700">算子與精度</span>
+                                    <p class="text-sm text-gray-500 mt-1">內建高度優化的 CUDA Kernels (如 FP8 量化、FlashAttention)，大幅減少顯存佔用。</p>
+                                </div>
+                            </li>
+                            <li class="flex items-start">
+                                <span class="bg-green-100 text-green-700 rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold mr-3 mt-1">2</span>
+                                <div>
+                                    <span class="font-bold text-gray-700">In-flight Batching</span>
+                                    <p class="text-sm text-gray-500 mt-1">打破傳統 Static Batching 需等待所有請求完成的限制。允許新請求隨時插入已完成的空缺。</p>
+                                </div>
+                            </li>
+                            <li class="flex items-start">
+                                <span class="bg-green-100 text-green-700 rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold mr-3 mt-1">3</span>
+                                <div>
+                                    <span class="font-bold text-gray-700">架構轉換</span>
+                                    <p class="text-sm text-gray-500 mt-1">將 PyTorch 模型轉換為 TensorRT 引擎，支援多節點高效部署。</p>
+                                </div>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Interactive Simulation Column -->
+                <div class="md:col-span-7">
+                    <div class="bg-gray-900 text-white p-6 rounded-2xl shadow-xl overflow-hidden relative">
+                        <div class="flex justify-between items-center mb-6">
+                            <h3 class="font-bold text-lg">推論排程模擬器 (Batching Simulator)</h3>
+                            <div class="flex bg-gray-800 rounded-lg p-1">
+                                <button onclick="setBatchMode('static')" id="btn-static" class="px-3 py-1 text-xs rounded font-bold bg-gray-600 text-white transition">Static Batching</button>
+                                <button onclick="setBatchMode('inflight')" id="btn-inflight" class="px-3 py-1 text-xs rounded font-bold text-gray-400 hover:text-white transition">In-flight Batching</button>
+                            </div>
+                        </div>
+
+                        <!-- Simulation Canvas -->
+                        <div class="h-48 bg-gray-800 rounded-lg border border-gray-700 relative mb-4 p-4 flex flex-col justify-center space-y-2" id="sim-container">
+                            <!-- Bars representing GPU slots/requests -->
+                            <div class="text-xs text-gray-400 mb-1">GPU Compute Timeline -></div>
+                            <div class="w-full h-8 bg-gray-700/50 rounded overflow-hidden flex items-center relative" id="track-1"></div>
+                            <div class="w-full h-8 bg-gray-700/50 rounded overflow-hidden flex items-center relative" id="track-2"></div>
+                            <div class="w-full h-8 bg-gray-700/50 rounded overflow-hidden flex items-center relative" id="track-3"></div>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-4 text-center">
+                            <div class="bg-gray-800 rounded p-3">
+                                <div class="text-gray-400 text-xs uppercase">GPU 利用率</div>
+                                <div class="text-xl font-bold text-green-400" id="metric-util">50%</div>
+                            </div>
+                            <div class="bg-gray-800 rounded p-3">
+                                <div class="text-gray-400 text-xs uppercase">延遲 (Latency)</div>
+                                <div class="text-xl font-bold text-yellow-400" id="metric-latency">High</div>
+                            </div>
+                        </div>
+                        
+                        <p class="mt-4 text-xs text-gray-400 italic" id="sim-explanation">
+                            Static: 短請求必須等待長請求完成，造成 GPU 空閒浪費 (灰色區域)。
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-gray-800 text-gray-300 py-8 mt-12">
+        <div class="container mx-auto px-4 text-center">
+            <p class="text-sm mb-2">Generated based on "NVIDIA LLM Acceleration & Optimization Mind Map"</p>
+            <p class="text-xs text-gray-500">© 2024 Interactive Report Demo. No SVG/Mermaid used.</p>
         </div>
-      </div>
+    </footer>
 
-      {/* Children Recursive Render */}
-      {isOpen && hasChildren && (
-        <div className="flex flex-col relative">
-           {/* Vertical line extension for children container */}
-           {level === 0 && <div className="absolute left-6 top-0 w-px h-full bg-gray-300 z-0"></div>}
-           
-          {node.children.map((child, index) => (
-            <TreeNode 
-              key={child.id} 
-              node={child} 
-              level={level + 1} 
-              isLast={index === node.children.length - 1}
-            />
-          ))}
-        </div>
-      )}
-    </div>
-  );
-};
+    <!-- JavaScript Logic -->
+    <script>
+        // --- 1. Memory Chart (Hardware Section) ---
+        const ctxMemory = document.getElementById('memoryChart').getContext('2d');
+        const memoryChart = new Chart(ctxMemory, {
+            type: 'bar',
+            data: {
+                labels: ['SRAM (L1/Shared)', 'HBM (High Bandwidth)'],
+                datasets: [
+                    {
+                        label: '頻寬 (TB/s)',
+                        data: [19, 3.3], // Approximate H100 values
+                        backgroundColor: 'rgba(118, 185, 0, 0.7)', // Nvidia Green
+                        borderColor: 'rgba(118, 185, 0, 1)',
+                        borderWidth: 1,
+                        yAxisID: 'y'
+                    },
+                    {
+                        label: '延遲 (Latency Score)',
+                        data: [1, 10], // Logical scale, lower is better but visualized as bars
+                        backgroundColor: 'rgba(59, 130, 246, 0.7)', // Blue
+                        borderColor: 'rgba(59, 130, 246, 1)',
+                        borderWidth: 1,
+                        yAxisID: 'y1'
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        type: 'linear',
+                        display: true,
+                        position: 'left',
+                        title: { display: true, text: 'Bandwidth (TB/s)' }
+                    },
+                    y1: {
+                        type: 'linear',
+                        display: true,
+                        position: 'right',
+                        title: { display: true, text: 'Latency (Relative)' },
+                        grid: { drawOnChartArea: false }
+                    }
+                },
+                plugins: {
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                let label = context.dataset.label || '';
+                                if (label) { label += ': '; }
+                                if (context.parsed.y !== null) { label += context.parsed.y; }
+                                return label;
+                            }
+                        }
+                    }
+                }
+            }
+        });
 
-export default function App() {
-  return (
-    <div className="min-h-screen bg-slate-50 p-4 md:p-8 font-sans text-gray-800">
-      <div className="max-w-5xl mx-auto">
-        <header className="mb-8 text-center">
-          <h1 className="text-3xl font-extrabold text-slate-800 tracking-tight">
-            NVIDIA LLM 全棧優化架構
-          </h1>
-          <p className="mt-2 text-slate-500">
-            互動式心智圖：從硬體基礎到應用層優化的完整路徑
-          </p>
-        </header>
+        // --- 2. Network Chart (Scaling Efficiency) ---
+        const ctxNetwork = document.getElementById('networkChart').getContext('2d');
+        const networkChart = new Chart(ctxNetwork, {
+            type: 'line',
+            data: {
+                labels: ['8 GPUs', '16 GPUs', '32 GPUs', '64 GPUs', '128 GPUs'],
+                datasets: [
+                    {
+                        label: '傳統 Ethernet/TCP',
+                        data: [90, 80, 65, 50, 35],
+                        borderColor: 'rgb(156, 163, 175)', // Gray
+                        backgroundColor: 'rgba(156, 163, 175, 0.1)',
+                        tension: 0.4,
+                        fill: true
+                    },
+                    {
+                        label: 'InfiniBand (RDMA + SHARP)',
+                        data: [98, 97, 96, 95, 94],
+                        borderColor: 'rgb(118, 185, 0)', // Nvidia Green
+                        backgroundColor: 'rgba(118, 185, 0, 0.1)',
+                        tension: 0.4,
+                        fill: true
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        max: 100,
+                        title: { display: true, text: 'Scaling Efficiency (%)' }
+                    }
+                },
+                interaction: {
+                    mode: 'index',
+                    intersect: false,
+                },
+            }
+        });
 
-        <div className="bg-white rounded-xl shadow-xl p-6 md:p-10 border border-slate-200 overflow-x-auto">
-          <TreeNode node={MindMapData} />
-        </div>
+        // --- 3. Interaction Logic ---
 
-        <footer className="mt-8 text-center text-sm text-gray-400">
-          Generated for NVIDIA Interview Preparation
-        </footer>
-      </div>
-    </div>
-  );
-}
+        // Toggle Details in Hardware Section
+        function toggleDetail(id) {
+            const el = document.getElementById(id);
+            if (el.classList.contains('hidden')) {
+                el.classList.remove('hidden');
+            } else {
+                el.classList.add('hidden');
+            }
+        }
+
+        // Network Tech Selection
+        const networkData = {
+            'rdma': {
+                title: 'RDMA (Remote Direct Memory Access)',
+                desc: '核心：允許 GPU 記憶體直接進行遠端存取，完全繞過 CPU。價值：消除 CPU 介入和記憶體拷貝帶來的延遲。這是 GPUDirect 技術的基礎。'
+            },
+            'sharp': {
+                title: 'SHARP (Scalable Hierarchical Aggregation)',
+                desc: '核心：在 InfiniBand 交換機硬體層級進行梯度聚合運算（例如：All-Reduce）。價值：減少網路傳輸數據量，極大加速大規模訓練的同步時間。'
+            },
+            'adaptive': {
+                title: '動態路由 (Adaptive Routing)',
+                desc: '核心：根據即時流量，自動將數據包分流到最空閒的路徑。價值：避免網路擁塞，維持大規模集群通訊的低延遲與一致性。'
+            }
+        };
+
+        function selectNetworkTech(techId) {
+            // Update UI styles
+            ['rdma', 'sharp', 'adaptive'].forEach(t => {
+                const el = document.getElementById('tech-' + t);
+                if (t === techId) {
+                    el.classList.add('border-green-500', 'bg-green-50');
+                    el.classList.remove('border-gray-200');
+                } else {
+                    el.classList.remove('border-green-500', 'bg-green-50');
+                    el.classList.add('border-gray-200');
+                }
+            });
+
+            // Update Text
+            const info = networkData[techId];
+            const titleEl = document.getElementById('net-title');
+            const descEl = document.getElementById('net-desc');
+
+            // Simple fade effect
+            descEl.style.opacity = 0;
+            setTimeout(() => {
+                titleEl.textContent = info.title;
+                descEl.textContent = info.desc;
+                descEl.style.opacity = 1;
+            }, 200);
+        }
+
+        // Batching Simulator Logic
+        let batchInterval;
+        function setBatchMode(mode) {
+            const btnStatic = document.getElementById('btn-static');
+            const btnInflight = document.getElementById('btn-inflight');
+            const tracks = [document.getElementById('track-1'), document.getElementById('track-2'), document.getElementById('track-3')];
+            const explanation = document.getElementById('sim-explanation');
+            const metricUtil = document.getElementById('metric-util');
+            const metricLat = document.getElementById('metric-latency');
+
+            // Reset UI
+            tracks.forEach(t => t.innerHTML = '');
+            clearInterval(batchInterval);
+
+            if (mode === 'static') {
+                btnStatic.className = 'px-3 py-1 text-xs rounded font-bold bg-green-600 text-white transition';
+                btnInflight.className = 'px-3 py-1 text-xs rounded font-bold text-gray-400 hover:text-white transition';
+                explanation.textContent = 'Static: 短請求 (綠色) 必須等待長請求 (紅色) 完成，造成 GPU 空閒浪費 (灰色間隙)。';
+                metricUtil.textContent = '55%';
+                metricUtil.className = 'text-xl font-bold text-yellow-400';
+                metricLat.textContent = 'High';
+                
+                // Simulate Static: Add blocks with gaps
+                const staticPattern = [
+                    { w: 'w-1/3', c: 'bg-red-500', gap: false }, // Long
+                    { w: 'w-1/6', c: 'bg-green-500', gap: true }, // Short + wait
+                    { w: 'w-1/4', c: 'bg-yellow-500', gap: true } // Med + wait
+                ];
+                
+                tracks.forEach((track, idx) => {
+                    const block = staticPattern[idx];
+                    let html = `<div class="h-full ${block.w} ${block.c} flex items-center justify-center text-[10px] font-bold">REQ</div>`;
+                    if (block.gap) {
+                        html += `<div class="h-full flex-grow bg-gray-600/30 flex items-center justify-center text-[10px] text-gray-500 border-l border-gray-600 border-dashed">WAIT</div>`;
+                    }
+                    track.innerHTML = html;
+                });
+
+            } else {
+                btnInflight.className = 'px-3 py-1 text-xs rounded font-bold bg-green-600 text-white transition';
+                btnStatic.className = 'px-3 py-1 text-xs rounded font-bold text-gray-400 hover:text-white transition';
+                explanation.textContent = 'In-flight: 允許新請求隨時插入空缺。GPU 始終保持忙碌，提升 Throughput。';
+                metricUtil.textContent = '95%';
+                metricUtil.className = 'text-xl font-bold text-green-400';
+                metricLat.textContent = 'Optimized';
+
+                // Simulate Inflight: Packed blocks
+                tracks.forEach((track) => {
+                    // Random generation to look busy
+                    let html = '';
+                    const widths = ['w-1/4', 'w-1/3', 'w-1/6', 'w-1/5'];
+                    const colors = ['bg-red-500', 'bg-green-500', 'bg-yellow-500', 'bg-blue-500'];
+                    
+                    for(let i=0; i<4; i++) {
+                        const w = widths[Math.floor(Math.random()*widths.length)];
+                        const c = colors[Math.floor(Math.random()*colors.length)];
+                        html += `<div class="h-full ${w} ${c} border-r border-gray-800 flex items-center justify-center text-[10px] font-bold">REQ</div>`;
+                    }
+                    track.innerHTML = html;
+                });
+            }
+        }
+
+        // Navigation Scroll
+        function scrollToSection(id) {
+            document.getElementById(id).scrollIntoView({ behavior: 'smooth' });
+        }
+
+        // Initialize Defaults
+        selectNetworkTech('rdma');
+        setBatchMode('static');
+
+    </script>
+</body>
+</html>
