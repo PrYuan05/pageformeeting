@@ -1,0 +1,304 @@
+import React, { useState, useRef, useEffect } from 'react';
+import { ChevronRight, ChevronDown, Database, Cpu, Network, Zap, Server, Layers, Box, Activity, GitMerge, ArrowLeftRight } from 'lucide-react';
+
+const MindMapData = {
+  id: 'root',
+  title: 'NVIDIA LLM 加速與全棧優化',
+  description: '核心目標：極限壓縮 LLM 訓練時間與推論延遲',
+  color: 'bg-green-600',
+  icon: <Activity className="w-6 h-6 text-white" />,
+  children: [
+    {
+      id: 'I',
+      title: 'I. 運算硬體平台與架構 (DGX SuperPOD)',
+      description: 'DGX SuperPOD 作為硬體基石，提供大規模、標準化的運算環境。',
+      color: 'bg-blue-600',
+      icon: <Server className="w-5 h-5 text-white" />,
+      children: [
+        {
+          id: 'I-1',
+          title: '1. GPU 記憶體階層 (Memory Hierarchy)',
+          color: 'bg-blue-500',
+          icon: <Database className="w-4 h-4 text-white" />,
+          children: [
+            {
+              id: 'I-1-SRAM',
+              title: 'SRAM (Static RAM)',
+              details: [
+                { label: '特點', value: '極小、極快、低延遲' },
+                { label: '用途', value: '存放 CUDA Kernel 正在運算中的臨時數據 (L1/Shared Memory)' },
+                { label: '優化點', value: '必須最大化數據重用，減少對 HBM 的存取' }
+              ]
+            },
+            {
+              id: 'I-1-HBM',
+              title: 'HBM (High Bandwidth Memory)',
+              details: [
+                { label: '特點', value: '容量大、頻寬高，但延遲高於 SRAM' },
+                { label: '用途', value: '存放 LLM 模型權重、KV Cache、大型中間張量' }
+              ]
+            }
+          ]
+        },
+        {
+          id: 'I-2',
+          title: '2. CUDA Kernels (底層運算指令)',
+          color: 'bg-blue-500',
+          icon: <Cpu className="w-4 h-4 text-white" />,
+          children: [
+            {
+              id: 'I-2-Opt',
+              title: '優化與實例',
+              details: [
+                { label: '定位', value: 'GPU 上的實際執行單元' },
+                { label: '優化目標', value: '算子融合 (Operator Fusion) & Tiling (分塊)，解決 Memory Wall' },
+                { label: '實例', value: 'FlashAttention / PagedAttention' },
+                { label: 'FlashAttention', value: '減少 HBM 讀寫比增加運算更能提升效率' }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      id: 'II',
+      title: 'II. 分散式通訊與網路 (NVLink & InfiniBand)',
+      description: '解決大規模運算中的「通訊牆」瓶頸。',
+      color: 'bg-purple-600',
+      icon: <Network className="w-5 h-5 text-white" />,
+      children: [
+        {
+          id: 'II-1',
+          title: '1. 節點內部高速互連 (Intra-Node)',
+          color: 'bg-purple-500',
+          icon: <Box className="w-4 h-4 text-white" />,
+          children: [
+            {
+              id: 'II-1-NVLink',
+              title: 'NVLink (點對點 & Switch)',
+              details: [
+                { label: '功能', value: '單台 DGX 內 GPU 間超高帶寬、低延遲連接' },
+                { label: '應用', value: '實現高效的 Tensor Parallelism (張量並行)' }
+              ]
+            }
+          ]
+        },
+        {
+          id: 'II-2',
+          title: '2. 節點間超大規模互連 (Inter-Node)',
+          color: 'bg-purple-500',
+          icon: <ArrowLeftRight className="w-4 h-4 text-white" />,
+          children: [
+            {
+              id: 'II-2-IB',
+              title: 'InfiniBand (骨幹網絡)',
+              children: [
+                {
+                  id: 'II-2-RDMA',
+                  title: '技術一：RDMA',
+                  details: [
+                    { label: '核心', value: 'GPUDirect RDMA 繞過 CPU，GPU 記憶體直接存取' },
+                    { label: '價值', value: '消除 CPU 介入延遲與記憶體拷貝' }
+                  ]
+                },
+                {
+                  id: 'II-2-SHARP',
+                  title: '技術二：SHARP',
+                  details: [
+                    { label: '核心', value: 'Switch 硬體層級進行梯度聚合 (All-Reduce)' },
+                    { label: '價值', value: '減少傳輸量，加速大規模訓練同步' }
+                  ]
+                },
+                {
+                  id: 'II-2-AR',
+                  title: '技術三：動態路由 (Adaptive Routing)',
+                  details: [
+                    { label: '核心', value: '依即時流量自動分流' },
+                    { label: '價值', value: '避免擁塞，維持低延遲一致性' }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          id: 'II-3',
+          title: '3. 分散式演算法',
+          color: 'bg-purple-500',
+          icon: <GitMerge className="w-4 h-4 text-white" />,
+          children: [
+            {
+              id: 'II-3-Algos',
+              title: 'AllReduce 策略',
+              details: [
+                { label: 'Ring-AllReduce', value: '帶寬效率高，適合大規模數據並行' },
+                { label: 'Tree-AllReduce', value: '延遲低，但有單點故障風險' }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      id: 'III',
+      title: 'III. 軟體平台與推論優化 (NVAIE & TensorRT-LLM)',
+      description: '將底層硬體能力轉換為企業級的穩定應用。',
+      color: 'bg-orange-600',
+      icon: <Layers className="w-5 h-5 text-white" />,
+      children: [
+        {
+          id: 'III-1',
+          title: '1. NVIDIA AI Enterprise (NVAIE)',
+          color: 'bg-orange-500',
+          icon: <Zap className="w-4 h-4 text-white" />,
+          children: [
+            {
+              id: 'III-1-Desc',
+              title: '企業級軟體套件',
+              details: [
+                { label: '定位', value: '提供驗證、優化的深度學習框架' },
+                { label: '價值', value: '確保 CUDA/TRT-LLM 穩定運行，提供原廠支援' }
+              ]
+            }
+          ]
+        },
+        {
+          id: 'III-2',
+          title: '2. TensorRT-LLM (推論優化核心)',
+          color: 'bg-orange-500',
+          icon: <Cpu className="w-4 h-4 text-white" />,
+          children: [
+            {
+              id: 'III-2-Opt',
+              title: '優化手段',
+              details: [
+                { label: '算子與精度', value: '內建 FP8 量化、FlashAttention' },
+                { label: '動態管理', value: 'In-flight Batching 最大化利用率，優化 TTFT' },
+                { label: '架構轉換', value: '模型轉為 TensorRT 引擎，支援多節點部署' }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+};
+
+const TreeNode = ({ node, level = 0, isLast = false }) => {
+  const [isOpen, setIsOpen] = useState(level < 2); // Auto open first 2 levels
+  const hasChildren = node.children && node.children.length > 0;
+  const hasDetails = node.details && node.details.length > 0;
+
+  const toggleOpen = () => setIsOpen(!isOpen);
+
+  return (
+    <div className="flex flex-col relative">
+      {/* Node Content */}
+      <div className={`flex items-start group ${level > 0 ? 'ml-8' : ''} relative`}>
+        {/* Connection Lines (Vertical and Horizontal) */}
+        {level > 0 && (
+          <>
+            {/* Vertical line from parent */}
+            <div className="absolute -left-8 top-0 w-px h-full bg-gray-300 group-last:h-6" style={{ height: isLast ? '24px' : '100%' }}></div>
+            {/* Horizontal line to node */}
+            <div className="absolute -left-8 top-6 w-8 h-px bg-gray-300"></div>
+          </>
+        )}
+
+        <div className="flex flex-col mb-4 w-full">
+          <div 
+            onClick={toggleOpen}
+            className={`
+              flex items-center p-3 rounded-lg shadow-sm border transition-all duration-200 cursor-pointer w-full md:w-auto md:max-w-2xl
+              ${level === 0 ? 'bg-slate-900 text-white border-slate-900' : 'bg-white hover:shadow-md border-gray-200'}
+              ${isOpen && hasChildren ? 'ring-2 ring-offset-1 ring-blue-100' : ''}
+            `}
+          >
+            {/* Icon */}
+            <div className={`
+              flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center mr-4 shadow-sm
+              ${node.color || 'bg-gray-500'}
+            `}>
+              {node.icon || <div className="w-2 h-2 bg-white rounded-full" />}
+            </div>
+
+            {/* Text Content */}
+            <div className="flex-grow">
+              <h3 className={`font-bold text-lg ${level === 0 ? 'text-white' : 'text-gray-800'}`}>
+                {node.title}
+              </h3>
+              {node.description && (
+                <p className={`text-sm mt-1 ${level === 0 ? 'text-gray-300' : 'text-gray-500'}`}>
+                  {node.description}
+                </p>
+              )}
+            </div>
+
+            {/* Chevron */}
+            {(hasChildren || hasDetails) && (
+              <div className={`ml-4 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}>
+                <ChevronDown className={`w-5 h-5 ${level === 0 ? 'text-white' : 'text-gray-400'}`} />
+              </div>
+            )}
+          </div>
+
+          {/* Details Panel (Leaf Nodes) */}
+          {isOpen && hasDetails && (
+             <div className="mt-2 ml-4 md:ml-14 p-4 bg-gray-50 rounded-lg border border-gray-200 text-sm shadow-inner">
+               <ul className="space-y-2">
+                 {node.details.map((detail, idx) => (
+                   <li key={idx} className="flex flex-col sm:flex-row sm:items-start gap-1 sm:gap-2">
+                     <span className="font-semibold text-blue-700 min-w-[60px]">{detail.label}:</span>
+                     <span className="text-gray-700">{detail.value}</span>
+                   </li>
+                 ))}
+               </ul>
+             </div>
+          )}
+        </div>
+      </div>
+
+      {/* Children Recursive Render */}
+      {isOpen && hasChildren && (
+        <div className="flex flex-col relative">
+           {/* Vertical line extension for children container */}
+           {level === 0 && <div className="absolute left-6 top-0 w-px h-full bg-gray-300 z-0"></div>}
+           
+          {node.children.map((child, index) => (
+            <TreeNode 
+              key={child.id} 
+              node={child} 
+              level={level + 1} 
+              isLast={index === node.children.length - 1}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default function App() {
+  return (
+    <div className="min-h-screen bg-slate-50 p-4 md:p-8 font-sans text-gray-800">
+      <div className="max-w-5xl mx-auto">
+        <header className="mb-8 text-center">
+          <h1 className="text-3xl font-extrabold text-slate-800 tracking-tight">
+            NVIDIA LLM 全棧優化架構
+          </h1>
+          <p className="mt-2 text-slate-500">
+            互動式心智圖：從硬體基礎到應用層優化的完整路徑
+          </p>
+        </header>
+
+        <div className="bg-white rounded-xl shadow-xl p-6 md:p-10 border border-slate-200 overflow-x-auto">
+          <TreeNode node={MindMapData} />
+        </div>
+
+        <footer className="mt-8 text-center text-sm text-gray-400">
+          Generated for NVIDIA Interview Preparation
+        </footer>
+      </div>
+    </div>
+  );
+}
